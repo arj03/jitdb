@@ -17,6 +17,7 @@ const {
   and,
   or,
   equal,
+  slowEqual,
   count,
   toCallback,
   toPullStream,
@@ -163,6 +164,110 @@ test('core indexes', (t) => {
         }
         t.end()
       })
+    }
+  )
+})
+
+const slowEqualHugeIndexQuery = (cb) => {
+  query(
+    fromDB(db),
+    where(slowEqual('value.content.type', 'post')),
+    toCallback((err, msgs) => {
+      if (err) {
+        cb(err)
+      } else if (msgs.length !== 23310) {
+        cb(new Error('msgs.length is wrong: ' + msgs.length))
+      }
+      cb()
+    })
+  )
+}
+
+test('slowEqual one huge index (first run)', (t) => {
+  runBenchmark(
+    'Query 1 big index with slowEqual (1st run)',
+    slowEqualHugeIndexQuery,
+    (cb) => {
+      closeLog((err) => {
+        if (err) cb(err)
+        else getJitdbReady(cb)
+      })
+    },
+    (err, result) => {
+      if (err) {
+        t.fail(err)
+      } else {
+        fs.appendFileSync(reportPath, result)
+        t.pass(result)
+      }
+      t.end()
+    }
+  )
+})
+
+test('slowEqual one huge index (second run)', (t) => {
+  runBenchmark(
+    'Query 1 big index with slowEqual (2nd run)',
+    slowEqualHugeIndexQuery,
+    (cb) => {
+      closeLog((err) => {
+        if (err) cb(err)
+        else getJitdbReady((err2) => {
+          if (err2) cb(err2)
+          else slowEqualHugeIndexQuery(cb)
+        })
+      })
+    },
+    (err, result) => {
+      if (err) {
+        t.fail(err)
+      } else {
+        fs.appendFileSync(reportPath, result)
+        t.pass(result)
+      }
+      t.end()
+    }
+  )
+})
+
+test('slowEqual count one huge index (third run)', (t) => {
+  runBenchmark(
+    'Query 1 big index with slowEqual (3rd run)',
+    (cb) => {
+      query(
+        fromDB(db),
+        where(slowEqual('value.content.type', 'post')),
+        count(),
+        toCallback((err, total) => {
+          if (err) {
+            cb(err)
+          } else if (total !== 23310) {
+            cb(new Error('total is wrong: ' + total))
+          }
+          cb()
+        })
+      )
+    },
+    (cb) => {
+      closeLog((err) => {
+        if (err) cb(err)
+        else getJitdbReady((err2) => {
+          if (err2) cb(err2)
+          else slowEqualHugeIndexQuery((err3) => {
+            if (err3) cb(err3)
+            else slowEqualHugeIndexQuery(cb)
+          })
+        })
+      })
+    },
+    (err, result) => {
+      if (err) {
+        t.fail(err)
+      } else {
+        fs.appendFileSync(reportPath, result)
+        t.pass(result)
+      }
+      t.end()
     }
   )
 })
